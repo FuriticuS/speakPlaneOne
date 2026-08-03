@@ -1,12 +1,13 @@
 import jwt from 'jsonwebtoken';
 import { AppError } from '../utils/appError.js';
+import { errorResponse } from '../utils/errorResponse.js';
 
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
   if (!token) {
-    return next(new AppError('Access token missing', 401));
+    return errorResponse(res, 401, 'Access token missing');
   }
 
   try {
@@ -14,7 +15,7 @@ const authMiddleware = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
-    return next(new AppError('Invalid or expired access token', 401));
+    return errorResponse(res, 401, 'Invalid or expired access token');
   }
 };
 
