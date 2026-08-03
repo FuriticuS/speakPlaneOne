@@ -45,7 +45,7 @@ const createRefreshToken = (user) =>
   });
 
 const registerUser = async (payload) => {
-  const { email, password } = validateAuthInput(payload, 'register');
+  const { email, password } = validateAuthInput(payload);
 
   const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
   if (existing.rowCount > 0) {
@@ -62,7 +62,7 @@ const registerUser = async (payload) => {
 };
 
 const loginUser = async (payload) => {
-  const { email, password } = validateAuthInput(payload, 'login');
+  const { email, password } = validateAuthInput(payload);
 
   const result = await query('SELECT * FROM users WHERE email = $1', [email]);
   const user = result.rows[0];
