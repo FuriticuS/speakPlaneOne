@@ -3,6 +3,9 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
+import projectsRoutes from './modules/projects/projectsRoutes.js';
+import pagesRoutes from './modules/pages/pagesRoutes.js';
+import blocksRoutes from './modules/blocks/blocksRoutes.js';
 import errorMiddleware from './middleware/errorMiddleware.js';
 
 dotenv.config();
@@ -19,6 +22,9 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/auth', authRoutes);
+app.use('/projects', projectsRoutes);
+app.use('/projects/:projectId/pages', pagesRoutes);
+app.use('/projects/:projectId/pages/:pageId/blocks', blocksRoutes);
 
 app.use(errorMiddleware);
 
