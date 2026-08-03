@@ -1,4 +1,8 @@
+import { logError } from '../utils/logger.js';
+
 const errorMiddleware = (err, req, res, next) => {
+  logError(err, req);
+
   const status = err.statusCode || 500;
   const message = err.message || 'Internal server error';
 
