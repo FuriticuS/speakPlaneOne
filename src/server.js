@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
+import errorMiddleware from './middleware/errorMiddleware.js';
 
 dotenv.config();
 
@@ -19,20 +20,7 @@ app.get('/health', (req, res) => {
 
 app.use('/auth', authRoutes);
 
-app.use((err, req, res, next) => {
-  const status = err.statusCode || 500;
-  const message = err.message || 'Internal server error';
-
-  res.status(status).json({
-    success: false,
-    error: {
-      message,
-      status,
-      path: req.originalUrl,
-      method: req.method,
-    },
-  });
-});
+app.use(errorMiddleware);
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
