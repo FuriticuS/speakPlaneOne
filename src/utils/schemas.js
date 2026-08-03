@@ -1,21 +1,26 @@
 import { z } from 'zod';
+import { authSchema } from '../schemas/auth.js';
+import { userIdParamSchema, paginationQuerySchema } from '../schemas/common.js';
+import { idParamSchema } from '../schemas/entities/common.js';
+import { projectBodySchema, projectParamsSchema } from '../schemas/entities/project.js';
+import { pageBodySchema, pageParamsSchema } from '../schemas/entities/page.js';
+import { blockBodySchema, blockParamsSchema } from '../schemas/entities/block.js';
 
-const authSchema = z.object({
-  email: z.string().trim().email('Please provide a valid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters long'),
+const pageListParamsSchema = z.object({
+  projectId: z.string().regex(/^\d+$/, 'Project id must be a number'),
 });
 
-const userIdParamSchema = z.object({
-  id: z.string().regex(/^\d+$/, 'User id must be a number'),
+const pageItemParamsSchema = pageListParamsSchema.extend({
+  id: z.string().regex(/^\d+$/, 'Page id must be a number'),
 });
 
-const paginationQuerySchema = z.object({
-  page: z.string().regex(/^\d+$/, 'Page must be a number').optional(),
-  limit: z.string().regex(/^\d+$/, 'Limit must be a number').optional(),
+const blockListParamsSchema = z.object({
+  projectId: z.string().regex(/^\d+$/, 'Project id must be a number'),
+  pageId: z.string().regex(/^\d+$/, 'Page id must be a number'),
 });
 
-const healthSchema = z.object({
-  status: z.string().optional(),
+const blockItemParamsSchema = blockListParamsSchema.extend({
+  id: z.string().regex(/^\d+$/, 'Block id must be a number'),
 });
 
-export { authSchema, userIdParamSchema, paginationQuerySchema, healthSchema };
+export { authSchema, userIdParamSchema, paginationQuerySchema, idParamSchema, projectBodySchema, projectParamsSchema, pageBodySchema, pageParamsSchema, blockBodySchema, blockParamsSchema, pageListParamsSchema, pageItemParamsSchema, blockListParamsSchema, blockItemParamsSchema };

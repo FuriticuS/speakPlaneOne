@@ -1,6 +1,5 @@
 import { registerUser, loginUser, refreshUserToken, getUserById, logoutUser } from '../services/authService.js';
 import { AppError } from '../utils/appError.js';
-import { errorResponse } from '../utils/errorResponse.js';
 
 const register = async (req, res, next) => {
   try {
