@@ -11,7 +11,11 @@ const optionalAuthMiddleware = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    req.user = decoded;
+    req.user = {
+      ...decoded,
+      role: decoded.role || 'user',
+      isAdmin: decoded.role === 'admin',
+    };
     next();
   } catch (error) {
     req.user = null;

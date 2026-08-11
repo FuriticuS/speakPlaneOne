@@ -6,8 +6,14 @@ const initDb = async () => {
       id SERIAL PRIMARY KEY,
       email VARCHAR(255) UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      role VARCHAR(20) NOT NULL DEFAULT 'user',
       created_at TIMESTAMP DEFAULT NOW()
     )
+  `);
+
+  await query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'
   `);
 
   await query(`
@@ -26,10 +32,16 @@ const initDb = async () => {
       id SERIAL PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
       description TEXT DEFAULT '',
+      status VARCHAR(20) NOT NULL DEFAULT 'draft',
       is_public BOOLEAN DEFAULT FALSE,
       owner_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       created_at TIMESTAMP DEFAULT NOW()
     )
+  `);
+
+  await query(`
+    ALTER TABLE projects
+    ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'draft'
   `);
 
   await query(`

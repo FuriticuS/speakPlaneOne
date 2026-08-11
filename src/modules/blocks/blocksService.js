@@ -1,7 +1,8 @@
 import { query } from '../../config/db.js';
 
 const listBlocks = async ({ user, projectId, pageId, query = {} }) => {
-  const { isAdmin = false, id: userId } = user || {};
+  const isAdmin = user?.role === 'admin';
+  const userId = user?.id;
   const { page = 1, limit = 20 } = query;
 
   const offset = (Number(page) - 1) * Number(limit);
@@ -20,6 +21,15 @@ const listBlocks = async ({ user, projectId, pageId, query = {} }) => {
     return [];
   }
 
+  // Проверка, что страница принадлежит проекту
+  const pageResult = await query(
+    `SELECT id FROM pages WHERE id = $1 AND project_id = $2`,
+    [pageId, projectId]
+  );
+  if (pageResult.rows.length === 0) {
+    return [];
+  }
+
   const result = await query(
     `
       SELECT id, type, payload, page_id, created_at
@@ -35,19 +45,29 @@ const listBlocks = async ({ user, projectId, pageId, query = {} }) => {
 };
 
 const createBlock = async ({ user, projectId, pageId, body }) => {
-  const { id: userId } = user || {};
+  const isAdmin = user?.role === 'admin';
+  const userId = user?.id;
   const { type, payload = {} } = body;
 
   const projectResult = await query(
     `SELECT owner_id FROM projects WHERE id = $1`,
-    [projectId]
+    [projectId],
   );
 
   if (projectResult.rows.length === 0) {
     return null;
   }
 
-  if (projectResult.rows[0].owner_id !== userId) {
+  if (!isAdmin && projectResult.rows[0].owner_id !== userId) {
+    return null;
+  }
+
+  // Проверка, что страница принадлежит проекту
+  const pageResult = await query(
+    `SELECT id FROM pages WHERE id = $1 AND project_id = $2`,
+    [pageId, projectId]
+  );
+  if (pageResult.rows.length === 0) {
     return null;
   }
 
@@ -57,14 +77,15 @@ const createBlock = async ({ user, projectId, pageId, body }) => {
       VALUES ($1, $2, $3)
       RETURNING id, type, payload, page_id, created_at
     `,
-    [type, payload, pageId]
+    [type, payload, pageId],
   );
 
   return result.rows[0];
 };
 
 const getBlockById = async ({ user, projectId, pageId, id }) => {
-  const { isAdmin = false, id: userId } = user || {};
+  const isAdmin = user?.role === 'admin';
+  const userId = user?.id;
 
   const projectResult = await query(
     `SELECT owner_id, is_public FROM projects WHERE id = $1`,
@@ -80,6 +101,15 @@ const getBlockById = async ({ user, projectId, pageId, id }) => {
     return null;
   }
 
+  // Проверка, что страница принадлежит проекту
+  const pageResult = await query(
+    `SELECT id FROM pages WHERE id = $1 AND project_id = $2`,
+    [pageId, projectId]
+  );
+  if (pageResult.rows.length === 0) {
+    return null;
+  }
+
   const result = await query(
     `SELECT id, type, payload, page_id, created_at FROM blocks WHERE id = $1 AND page_id = $2`,
     [id, pageId]
@@ -89,7 +119,8 @@ const getBlockById = async ({ user, projectId, pageId, id }) => {
 };
 
 const updateBlock = async ({ user, projectId, pageId, id, body }) => {
-  const { isAdmin = false, id: userId } = user || {};
+  const isAdmin = user?.role === 'admin';
+  const userId = user?.id;
   const { type, payload } = body;
 
   const projectResult = await query(
@@ -102,6 +133,15 @@ const updateBlock = async ({ user, projectId, pageId, id, body }) => {
   }
 
   if (!isAdmin && projectResult.rows[0].owner_id !== userId) {
+    return null;
+  }
+
+  // Проверка, что страница принадлежит проекту
+  const pageResult = await query(
+    `SELECT id FROM pages WHERE id = $1 AND project_id = $2`,
+    [pageId, projectId]
+  );
+  if (pageResult.rows.length === 0) {
     return null;
   }
 
@@ -134,7 +174,8 @@ const updateBlock = async ({ user, projectId, pageId, id, body }) => {
 };
 
 const deleteBlock = async ({ user, projectId, pageId, id }) => {
-  const { isAdmin = false, id: userId } = user || {};
+  const isAdmin = user?.role === 'admin';
+  const userId = user?.id;
 
   const projectResult = await query(
     `SELECT owner_id FROM projects WHERE id = $1`,
@@ -146,6 +187,15 @@ const deleteBlock = async ({ user, projectId, pageId, id }) => {
   }
 
   if (!isAdmin && projectResult.rows[0].owner_id !== userId) {
+    return null;
+  }
+
+  // Проверка, что страница принадлежит проекту
+  const pageResult = await query(
+    `SELECT id FROM pages WHERE id = $1 AND project_id = $2`,
+    [pageId, projectId]
+  );
+  if (pageResult.rows.length === 0) {
     return null;
   }
 
