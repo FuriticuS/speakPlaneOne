@@ -35,9 +35,13 @@ const hashPassword = async (password) => bcrypt.hash(password, 10);
 const comparePassword = async (password, hash) => bcrypt.compare(password, hash);
 
 const createAccessToken = (user) =>
-  jwt.sign({ id: user.id, email: user.email }, process.env.JWT_ACCESS_SECRET, {
-    expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
-  });
+  jwt.sign(
+    { id: user.id, email: user.email, role: user.role || 'user' },
+    process.env.JWT_ACCESS_SECRET,
+    {
+      expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
+    },
+  );
 
 const createRefreshToken = (user) =>
   jwt.sign({ id: user.id }, process.env.JWT_REFRESH_SECRET, {
@@ -54,8 +58,8 @@ const registerUser = async (payload) => {
 
   const passwordHash = await hashPassword(password);
   const result = await query(
-    'INSERT INTO users (email, password_hash, created_at) VALUES ($1, $2, NOW()) RETURNING id, email, created_at',
-    [email, passwordHash],
+    'INSERT INTO users (email, password_hash, role, created_at) VALUES ($1, $2, $3, NOW()) RETURNING id, email, role, created_at',
+    [email, passwordHash, 'user'],
   );
 
   return result.rows[0];
@@ -81,7 +85,7 @@ const loginUser = async (payload) => {
   await addRefreshToken(user.id, refreshToken);
 
   return {
-    user: { id: user.id, email: user.email, createdAt: user.created_at },
+    user: { id: user.id, email: user.email, role: user.role || 'user', createdAt: user.created_at },
     accessToken,
     refreshToken,
   };
@@ -104,7 +108,7 @@ const refreshUserToken = async (refreshToken) => {
     throw new AppError('Invalid or expired refresh token', 401);
   }
 
-  const result = await query('SELECT id, email, created_at FROM users WHERE id = $1', [decoded.id]);
+  const result = await query('SELECT id, email, role, created_at FROM users WHERE id = $1', [decoded.id]);
   const user = result.rows[0];
 
   if (!user) {
@@ -115,11 +119,15 @@ const refreshUserToken = async (refreshToken) => {
   const newRefreshToken = createRefreshToken(user);
   await rotateRefreshToken(refreshToken, newRefreshToken, user.id);
 
-  return { user, accessToken, refreshToken: newRefreshToken };
+  return {
+    user: { id: user.id, email: user.email, role: user.role || 'user', createdAt: user.created_at },
+    accessToken,
+    refreshToken: newRefreshToken,
+  };
 };
 
 const getUserById = async (id) => {
-  const result = await query('SELECT id, email, created_at FROM users WHERE id = $1', [id]);
+  const result = await query('SELECT id, email, role, created_at FROM users WHERE id = $1', [id]);
   return result.rows[0];
 };
 

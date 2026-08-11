@@ -1,7 +1,8 @@
 import { query } from '../../config/db.js';
 
 const listPages = async ({ user, projectId, query = {} }) => {
-  const { isAdmin = false, id: userId } = user || {};
+  const isAdmin = user?.role === 'admin';
+  const userId = user?.id;
   const { page = 1, limit = 20 } = query;
 
   const offset = (Number(page) - 1) * Number(limit);
@@ -35,12 +36,13 @@ const listPages = async ({ user, projectId, query = {} }) => {
 };
 
 const createPage = async ({ user, projectId, body }) => {
-  const { id: userId } = user || {};
+  const isAdmin = user?.role === 'admin';
+  const userId = user?.id;
   const { title, content = '' } = body;
 
   const projectResult = await query(
     `SELECT owner_id FROM projects WHERE id = $1`,
-    [projectId]
+    [projectId],
   );
 
   if (projectResult.rows.length === 0) {
@@ -48,7 +50,7 @@ const createPage = async ({ user, projectId, body }) => {
   }
 
   const project = projectResult.rows[0];
-  if (project.owner_id !== userId) {
+  if (!isAdmin && project.owner_id !== userId) {
     return null;
   }
 
@@ -58,14 +60,15 @@ const createPage = async ({ user, projectId, body }) => {
       VALUES ($1, $2, $3)
       RETURNING id, title, content, project_id, created_at
     `,
-    [title, content, projectId]
+    [title, content, projectId],
   );
 
   return result.rows[0];
 };
 
 const getPageById = async ({ user, projectId, id }) => {
-  const { isAdmin = false, id: userId } = user || {};
+  const isAdmin = user?.role === 'admin';
+  const userId = user?.id;
 
   const projectResult = await query(
     `SELECT owner_id, is_public FROM projects WHERE id = $1`,
@@ -90,7 +93,8 @@ const getPageById = async ({ user, projectId, id }) => {
 };
 
 const updatePage = async ({ user, projectId, id, body }) => {
-  const { isAdmin = false, id: userId } = user || {};
+  const isAdmin = user?.role === 'admin';
+  const userId = user?.id;
   const { title, content } = body;
 
   const projectResult = await query(
@@ -135,7 +139,8 @@ const updatePage = async ({ user, projectId, id, body }) => {
 };
 
 const deletePage = async ({ user, projectId, id }) => {
-  const { isAdmin = false, id: userId } = user || {};
+  const isAdmin = user?.role === 'admin';
+  const userId = user?.id;
 
   const projectResult = await query(
     `SELECT owner_id FROM projects WHERE id = $1`,
