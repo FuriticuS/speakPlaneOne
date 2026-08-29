@@ -37,82 +37,55 @@ test('AppError — 409 Conflict', () => {
   assert.equal(err.statusCode, 409);
 });
 
-// ==================== Сценарии прав доступа (логика без БД) ====================
+// ==================== Сценарии прав доступа к блокам (логика без БД) ====================
 
-test('Права: guest (user = null) — не видит закрытые проекты', () => {
+test('Права: guest видит все блоки (публичная карта)', () => {
   const user = null;
-  const project = { is_public: false, owner_id: 5 };
-  const canView = user?.role === 'admin' || project.is_public || project.owner_id === user?.id;
-  assert.equal(canView, false);
+  const canView = true; // все блоки публичные
+  assert.equal(canView, true);
 });
 
-test('Права: guest (user = null) — видит публичные проекты', () => {
+test('Права: guest не может создавать блоки', () => {
   const user = null;
-  const project = { is_public: true, owner_id: 5 };
-  const canView = user?.role === 'admin' || project.is_public || project.owner_id === user?.id;
-  assert.equal(canView, true);
+  const canCreate = Boolean(user?.id);
+  assert.equal(canCreate, false);
 });
 
-test('Права: user — видит свои закрытые проекты', () => {
+test('Права: user может создавать блоки', () => {
   const user = { id: 5, role: 'user' };
-  const project = { is_public: false, owner_id: 5 };
-  const canView = user.role === 'admin' || project.is_public || project.owner_id === user.id;
-  assert.equal(canView, true);
+  const canCreate = Boolean(user?.id);
+  assert.equal(canCreate, true);
 });
 
-test('Права: user — не видит чужие закрытые проекты', () => {
+test('Права: user может писать только в свой незаполненный блок', () => {
   const user = { id: 5, role: 'user' };
-  const project = { is_public: false, owner_id: 99 };
-  const canView = user.role === 'admin' || project.is_public || project.owner_id === user.id;
-  assert.equal(canView, false);
+  const block = { owner_id: 5, content: null };
+  const canWrite = block.owner_id === user.id && block.content === null;
+  assert.equal(canWrite, true);
 });
 
-test('Права: user — видит чужие публичные проекты', () => {
+test('Права: user не может писать в чужой блок', () => {
   const user = { id: 5, role: 'user' };
-  const project = { is_public: true, owner_id: 99 };
-  const canView = user.role === 'admin' || project.is_public || project.owner_id === user.id;
-  assert.equal(canView, true);
+  const block = { owner_id: 99, content: null };
+  const canWrite = block.owner_id === user.id && block.content === null;
+  assert.equal(canWrite, false);
 });
 
-test('Права: admin — видит всё', () => {
+test('Права: повторная запись в уже заполненный блок запрещена', () => {
+  const user = { id: 5, role: 'user' };
+  const block = { owner_id: 5, content: 'уже написан' };
+  const canWrite = block.owner_id === user.id && block.content === null;
+  assert.equal(canWrite, false);
+});
+
+test('Права: user не может удалять блоки', () => {
+  const user = { id: 5, role: 'user' };
+  const canDelete = user?.role === 'admin';
+  assert.equal(canDelete, false);
+});
+
+test('Права: admin может удалять любые блоки', () => {
   const user = { id: 1, role: 'admin' };
-  const project = { is_public: false, owner_id: 99 };
-  const canView = user.role === 'admin' || project.is_public || project.owner_id === user.id;
-  assert.equal(canView, true);
-});
-
-test('Права: user — может редактировать только свои проекты', () => {
-  const user = { id: 5, role: 'user' };
-  const owner_id = 5;
-  const canEdit = user.role === 'admin' || owner_id === user.id;
-  assert.equal(canEdit, true);
-});
-
-test('Права: user — не может редактировать чужие проекты', () => {
-  const user = { id: 5, role: 'user' };
-  const owner_id = 99;
-  const canEdit = user.role === 'admin' || owner_id === user.id;
-  assert.equal(canEdit, false);
-});
-
-test('Права: admin — может редактировать всё', () => {
-  const user = { id: 1, role: 'admin' };
-  const owner_id = 99;
-  const canEdit = user.role === 'admin' || owner_id === user.id;
-  assert.equal(canEdit, true);
-});
-
-// ==================== page → project принадлежность ====================
-
-test('Принадлежность: страница принадлежит проекту', () => {
-  // Имитация проверки: page.project_id === projectId
-  const page = { id: 10, project_id: 3 };
-  const projectId = 3;
-  assert.equal(page.project_id === projectId, true);
-});
-
-test('Принадлежность: страница НЕ принадлежит проекту', () => {
-  const page = { id: 10, project_id: 3 };
-  const projectId = 99;
-  assert.equal(page.project_id === projectId, false);
+  const canDelete = user?.role === 'admin';
+  assert.equal(canDelete, true);
 });

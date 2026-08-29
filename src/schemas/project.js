@@ -1,9 +1,0 @@
-import { z } from 'zod';
-
-const projectSchema = z.object({
-  name: z.string().trim().min(1, 'Project name is required').max(100, 'Project name must be at most 100 characters'),
-  description: z.string().trim().max(2000, 'Description must be at most 2000 characters').optional(),
-  status: z.enum(['draft', 'active', 'completed'], { errorMap: () => ({ message: 'Status must be draft, active or completed' }) }).optional(),
-});
-
-export { projectSchema };

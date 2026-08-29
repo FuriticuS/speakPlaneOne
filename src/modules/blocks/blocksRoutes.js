@@ -1,21 +1,21 @@
 import express from 'express';
-import { listBlocks, createBlock, getBlockById, updateBlock, deleteBlock } from './blocksController.js';
+import { listBlocks, getBlockById, createBlock, updateBlock, deleteBlock } from './blocksController.js';
 import authMiddleware from '../../middleware/authMiddleware.js';
 import optionalAuthMiddleware from '../../middleware/optionalAuthMiddleware.js';
 import validateMiddleware from '../../middleware/validateMiddleware.js';
-import { blockBodySchema } from '../../schemas/entities/block.js';
-import { blockListParamsSchema, blockItemParamsSchema } from '../../utils/schemas.js';
+import {
+  blockCreateSchema,
+  blockUpdateSchema,
+  blockParamsSchema,
+  blockBboxQuerySchema,
+} from '../../schemas/entities/block.js';
 
-const router = express.Router({ mergeParams: true });
-const blockRouteParamsSchema = blockListParamsSchema;
-const blockItemRouteParamsSchema = blockItemParamsSchema;
-const blockCreateBodySchema = blockBodySchema;
-const blockUpdateBodySchema = blockBodySchema.partial();
+const router = express.Router();
 
-router.get('/', optionalAuthMiddleware, validateMiddleware({ params: blockRouteParamsSchema }), listBlocks);
-router.post('/', authMiddleware, validateMiddleware({ params: blockRouteParamsSchema }), validateMiddleware({ body: blockCreateBodySchema }), createBlock);
-router.get('/:id', optionalAuthMiddleware, validateMiddleware({ params: blockItemRouteParamsSchema }), getBlockById);
-router.put('/:id', authMiddleware, validateMiddleware({ params: blockItemRouteParamsSchema }), validateMiddleware({ body: blockUpdateBodySchema }), updateBlock);
-router.delete('/:id', authMiddleware, validateMiddleware({ params: blockItemRouteParamsSchema }), deleteBlock);
+router.get('/', optionalAuthMiddleware, validateMiddleware({ query: blockBboxQuerySchema }), listBlocks);
+router.post('/', authMiddleware, validateMiddleware({ body: blockCreateSchema }), createBlock);
+router.get('/:id', optionalAuthMiddleware, validateMiddleware({ params: blockParamsSchema }), getBlockById);
+router.put('/:id', authMiddleware, validateMiddleware({ params: blockParamsSchema }), validateMiddleware({ body: blockUpdateSchema }), updateBlock);
+router.delete('/:id', authMiddleware, validateMiddleware({ params: blockParamsSchema }), deleteBlock);
 
 export default router;
