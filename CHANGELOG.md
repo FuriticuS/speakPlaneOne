@@ -2,28 +2,6 @@
 
 Все значимые изменения проекта будут описаны в этом файле.
 
-## [v0.0.3] - 2026-08-29
-
-### Added
-- Новая модель данных: `blocks` (блоки-«страны» с геометрией `x/y/width/height`, `parent_id`, `edge`, `owner_id`) вместо старой `Project → Page → Block`
-- Профильные поля `users`: `name`, `gender`, `age` (заполняются на `/settings` после регистрации)
-- `config/constants.js`: константы геометрии (размеры блоков, размер символа/строки для ёмкости, радиус поиска соседей)
-- `modules/blocks/blocksGeometry.js`: чистая геометрия — `capacity()`, `positionForEdge()`, `parseBbox()`
-- Алгоритм роста «магнит»: клик по пустому → блоки рядом → у кого свободная грань → случайный выбор → приклеить блок случайного размера
-- Эндпоинты блоков: `GET /blocks?bbox=`, `GET /blocks/:id`, `POST /blocks`, `PUT /blocks/:id` (запись один раз, проверка ёмкости), `DELETE /blocks/:id` (только admin)
-- Модуль профиля: `GET/PUT /profile`
-- Сид корневого блока в `(0,0)` с текстом «Добро пожаловать в SpeakPlane»
-- Роль `admin`: удаление любых блоков (модерация); обычный user — создать + записать свой блок один раз
-
-### Changed
-- `init-db.js`: новые таблицы + профильные поля + удаление старых `projects`/`pages`/`blocks`
-- `server.js`: маршруты `/blocks` и `/profile`, убраны старые `/projects` и `/pages`
-- Схемы Zod: новые `blockCreateSchema`/`blockUpdateSchema`/`blockParamsSchema`/`blockBboxQuerySchema`, `profileSchema`
-
-### Notes
-- Права: guest — смотреть, user — создавать + писать один раз, admin — удалять
-- Редактирование текста после первой записи запрещено (409)
-
 ## [v0.0.2] - 2026-08-11
 
 ### Added

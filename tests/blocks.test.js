@@ -1,42 +1,57 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  blockCreateSchema,
-  blockUpdateSchema,
-  blockParamsSchema,
-  blockBboxQuerySchema,
-} from '../src/schemas/entities/block.js';
-import { capacity, positionForEdge, parseBbox } from '../src/modules/blocks/blocksGeometry.js';
+import { blockBodySchema, blockParamsSchema } from '../src/schemas/entities/block.js';
+import { blockListParamsSchema, blockItemParamsSchema } from '../src/utils/schemas.js';
 
-// ==================== blockCreateSchema ====================
+// ==================== blockBodySchema ====================
 
-test('blockCreateSchema — валидные координаты (числа)', () => {
-  const result = blockCreateSchema.parse({ x: 10, y: -20.5 });
-  assert.equal(result.x, 10);
-  assert.equal(result.y, -20.5);
+test('blockBodySchema — валидное тело блока (text)', () => {
+  const result = blockBodySchema.parse({ type: 'text', payload: { text: 'Hello' } });
+  assert.equal(result.type, 'text');
+  assert.deepEqual(result.payload, { text: 'Hello' });
 });
 
-test('blockCreateSchema — коэрсит строковые координаты', () => {
-  const result = blockCreateSchema.parse({ x: '100', y: '0' });
-  assert.equal(result.x, 100);
-  assert.equal(result.y, 0);
+test('blockBodySchema — валидное тело блока (image)', () => {
+  const result = blockBodySchema.parse({ type: 'image', payload: { src: 'url' } });
+  assert.equal(result.type, 'image');
 });
 
-test('blockCreateSchema — отклоняет отсутствующие координаты', () => {
-  assert.throws(() => blockCreateSchema.parse({}), (err) => {
+test('blockBodySchema — валидное тело блока (button)', () => {
+  const result = blockBodySchema.parse({ type: 'button' });
+  assert.equal(result.type, 'button');
+});
+
+test('blockBodySchema — payload опционален', () => {
+  const result = blockBodySchema.parse({ type: 'text' });
+  assert.equal(result.payload, undefined);
+});
+
+test('blockBodySchema — отклоняет недопустимый type', () => {
+  assert.throws(() => blockBodySchema.parse({ type: 'video' }), (err) => {
+    assert.ok(err.issues[0].message.toLowerCase().includes('text') || err.issues[0].message.toLowerCase().includes('button'));
+    return true;
+  });
+});
+
+test('blockBodySchema — отклоняет отсутствующий type', () => {
+  assert.throws(() => blockBodySchema.parse({ payload: {} }), (err) => {
     assert.ok(err.issues.length > 0);
     return true;
   });
 });
 
-// ==================== blockUpdateSchema ====================
-
-test('blockUpdateSchema — валидный content', () => {
-  assert.equal(blockUpdateSchema.parse({ content: 'Hello' }).content, 'Hello');
+test('blockBodySchema — partial() позволяет пустой объект', () => {
+  assert.doesNotThrow(() => blockBodySchema.partial().parse({}));
 });
 
-test('blockUpdateSchema — отклоняет пустой content', () => {
-  assert.throws(() => blockUpdateSchema.parse({ content: '' }));
+test('blockBodySchema — partial() позволяет только type', () => {
+  const result = blockBodySchema.partial().parse({ type: 'image' });
+  assert.equal(result.type, 'image');
+});
+
+test('blockBodySchema — partial() позволяет только payload', () => {
+  const result = blockBodySchema.partial().parse({ payload: { text: 'updated' } });
+  assert.deepEqual(result.payload, { text: 'updated' });
 });
 
 // ==================== blockParamsSchema ====================
@@ -46,36 +61,62 @@ test('blockParamsSchema — валидный id', () => {
 });
 
 test('blockParamsSchema — отклоняет нечисловой id', () => {
-  assert.throws(() => blockParamsSchema.parse({ id: 'abc' }));
+  assert.throws(() => blockParamsSchema.parse({ id: 'xyz' }), (err) => {
+    assert.ok(err.issues[0].message.includes('number'));
+    return true;
+  });
 });
 
-// ==================== blockBboxQuerySchema ====================
+// ==================== blockListParamsSchema ====================
 
-test('blockBboxQuerySchema — валидный bbox', () => {
-  assert.doesNotThrow(() => blockBboxQuerySchema.parse({ bbox: '-10.5,0,10,20' }));
+test('blockListParamsSchema — валидные projectId и pageId', () => {
+  assert.doesNotThrow(() => blockListParamsSchema.parse({ projectId: '1', pageId: '2' }));
 });
 
-test('blockBboxQuerySchema — отклоняет неполный bbox', () => {
-  assert.throws(() => blockBboxQuerySchema.parse({ bbox: '1,2,3' }));
+test('blockListParamsSchema — отклоняет нечисловой projectId', () => {
+  assert.throws(() => blockListParamsSchema.parse({ projectId: 'abc', pageId: '2' }), (err) => {
+    assert.ok(err.issues[0].message.includes('number'));
+    return true;
+  });
 });
 
-// ==================== geometry helpers ====================
-
-test('capacity — целочисленная оценка ёмкости', () => {
-  // 100 * 100 = 10000 / (8 * 14 = 112) = 89.28 → 89
-  assert.equal(capacity(100, 100), 89);
+test('blockListParamsSchema — отклоняет нечисловой pageId', () => {
+  assert.throws(() => blockListParamsSchema.parse({ projectId: '1', pageId: 'abc' }), (err) => {
+    assert.ok(err.issues[0].message.includes('number'));
+    return true;
+  });
 });
 
-test('positionForEdge — приклейка по всем граням', () => {
-  const parent = { x: 0, y: 0, width: 100, height: 50 };
-  assert.deepEqual(positionForEdge(parent, 'south', 40, 30), { x: 0, y: 50 });
-  assert.deepEqual(positionForEdge(parent, 'east', 40, 30), { x: 100, y: 0 });
-  assert.deepEqual(positionForEdge(parent, 'north', 40, 30), { x: 0, y: -30 });
-  assert.deepEqual(positionForEdge(parent, 'west', 40, 30), { x: -40, y: 0 });
+test('blockListParamsSchema — отклоняет отсутствующий projectId', () => {
+  assert.throws(() => blockListParamsSchema.parse({ pageId: '2' }), (err) => {
+    assert.ok(err.issues.length > 0);
+    return true;
+  });
 });
 
-test('parseBbox — разбирает строку и отдаёт null без bbox', () => {
-  assert.deepEqual(parseBbox('1,2,3,4'), [1, 2, 3, 4]);
-  assert.equal(parseBbox(null), null);
-  assert.equal(parseBbox(undefined), null);
+test('blockListParamsSchema — отклоняет отсутствующий pageId', () => {
+  assert.throws(() => blockListParamsSchema.parse({ projectId: '1' }), (err) => {
+    assert.ok(err.issues.length > 0);
+    return true;
+  });
+});
+
+// ==================== blockItemParamsSchema ====================
+
+test('blockItemParamsSchema — валидные projectId, pageId и id', () => {
+  assert.doesNotThrow(() => blockItemParamsSchema.parse({ projectId: '1', pageId: '2', id: '3' }));
+});
+
+test('blockItemParamsSchema — отклоняет отсутствующий id', () => {
+  assert.throws(() => blockItemParamsSchema.parse({ projectId: '1', pageId: '2' }), (err) => {
+    assert.ok(err.issues.length > 0);
+    return true;
+  });
+});
+
+test('blockItemParamsSchema — отклоняет нечисловой id', () => {
+  assert.throws(() => blockItemParamsSchema.parse({ projectId: '1', pageId: '2', id: 'abc' }), (err) => {
+    assert.ok(err.issues[0].message.includes('number'));
+    return true;
+  });
 });
