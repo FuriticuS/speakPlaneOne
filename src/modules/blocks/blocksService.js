@@ -1,18 +1,9 @@
 import { query } from '../../config/db.js';
 import { AppError } from '../../utils/appError.js';
 import { BLOCK, BLOCK_EDGES } from '../../config/constants.js';
-import { capacity, positionForEdge, parseBbox } from './blocksGeometry.js';
+import { capacity, positionAdjacent, parseBbox } from './blocksGeometry.js';
 
 const BLOCK_COLUMNS = 'id, content, x, y, width, height, parent_id, edge, owner_id, created_at';
-
-// Грань, противоположная той, которой блок приклеен к родителю.
-// Если блок прикреплён к родителю с востока, то его западная грань занята родителем.
-const OPPOSITE_EDGE = {
-  north: 'south',
-  south: 'north',
-  east: 'west',
-  west: 'east',
-};
 
 // Пересекаются ли два прямоугольника (касание гранями — не пересечение).
 const rectsOverlap = (a, b) =>
@@ -69,70 +60,54 @@ const createBlock = async ({ user, x, y }) => {
     throw new AppError('No blocks nearby to attach', 400);
   }
 
-  const ids = nearby.rows.map((row) => row.id);
-
-  // 2. Грани, уже занятые детьми, у найденных блоков.
-  const usedResult = await query(
-    `SELECT parent_id, edge FROM blocks WHERE parent_id = ANY($1::int[]) AND edge IS NOT NULL`,
-    [ids],
-  );
-
-  const usedByParent = new Map();
-  for (const row of usedResult.rows) {
-    if (!usedByParent.has(row.parent_id)) usedByParent.set(row.parent_id, new Set());
-    usedByParent.get(row.parent_id).add(row.edge);
-  }
-
-  // 3. Кандидаты: блоки со свободной гранью. Грань, обращённая к родителю,
-  //    тоже считается занятой (иначе новый блок лёг бы поверх родителя).
-  const candidates = nearby.rows
-    .map((block) => {
-      const used = usedByParent.get(block.id) || new Set();
-      if (block.edge) used.add(OPPOSITE_EDGE[block.edge]);
-      const free = BLOCK_EDGES.filter((edge) => !used.has(edge));
-      return { block, free };
-    })
-    .filter((candidate) => candidate.free.length > 0);
-
-  if (candidates.length === 0) {
-    throw new AppError('No free edges nearby', 400);
-  }
-
-  // 4. Все существующие блоки — для проверки пересечений.
+  // 2. Все существующие блоки — для проверки пересечений.
   const allResult = await query(`SELECT x, y, width, height FROM blocks`);
   const existing = allResult.rows;
 
   const overlaps = (rect) => existing.some((block) => rectsOverlap(rect, block));
 
-  // 5. Сортируем кандидатов по расстоянию до клика — примагничиваемся
-  //    к ближайшему блоку, а не к случайному.
-  const orderedCandidates = [...candidates].sort(
-    (a, b) => distanceToRect(x, y, a.block) - distanceToRect(x, y, b.block),
-  );
+  // 3. Перебираем родителя, грань и случайный размер. Новый блок прижимается
+  //    к грани и сдвигается вдоль неё к точке клика (positionAdjacent), поэтому
+  //    он может лечь в пустоту между несколькими блоками и примагнититься сразу
+  //    к нескольким соседям, а не только к одной свободной грани.
+  const ATTEMPTS_PER_EDGE = 20;
+  let best = null;
 
-  for (const { block: parent, free } of orderedCandidates) {
-    const shuffledEdges = [...free].sort(() => Math.random() - 0.5);
-
-    for (const edge of shuffledEdges) {
-      for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (const parent of nearby.rows) {
+    for (const edge of BLOCK_EDGES) {
+      for (let attempt = 0; attempt < ATTEMPTS_PER_EDGE; attempt += 1) {
         const width = BLOCK.MIN_SIZE + Math.random() * (BLOCK.MAX_SIZE - BLOCK.MIN_SIZE);
         const height = BLOCK.MIN_SIZE + Math.random() * (BLOCK.MAX_SIZE - BLOCK.MIN_SIZE);
-        const pos = positionForEdge(parent, edge, width, height);
+        const pos = positionAdjacent(parent, edge, width, height, x, y);
+        const rect = { ...pos, width, height };
 
-        if (!overlaps({ ...pos, width, height })) {
-          const result = await query(
-            `INSERT INTO blocks (content, x, y, width, height, parent_id, edge, owner_id)
-             VALUES (NULL, $1, $2, $3, $4, $5, $6, $7)
-             RETURNING ${BLOCK_COLUMNS}`,
-            [pos.x, pos.y, width, height, parent.id, edge, user.id],
-          );
-          return withCapacity(result.rows[0]);
+        if (overlaps(rect)) continue;
+
+        const distance = distanceToRect(x, y, rect);
+        const area = width * height;
+        // Ближе к клику — лучше; при равном расстоянии — блок крупнее.
+        if (
+          !best ||
+          distance < best.distance ||
+          (distance === best.distance && area > best.area)
+        ) {
+          best = { parent, edge, pos, width, height, distance, area };
         }
       }
     }
   }
 
-  throw new AppError('No free space nearby', 400);
+  if (!best) {
+    throw new AppError('No free space nearby', 400);
+  }
+
+  const result = await query(
+    `INSERT INTO blocks (content, x, y, width, height, parent_id, edge, owner_id)
+     VALUES (NULL, $1, $2, $3, $4, $5, $6, $7)
+     RETURNING ${BLOCK_COLUMNS}`,
+    [best.pos.x, best.pos.y, best.width, best.height, best.parent.id, best.edge, user.id],
+  );
+  return withCapacity(result.rows[0]);
 };
 
 const updateBlock = async ({ user, id, content }) => {
