@@ -1,6 +1,7 @@
 import { query } from './config/db.js';
 
 const initDb = async () => {
+  // ---------- users ----------
   await query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
@@ -11,11 +12,12 @@ const initDb = async () => {
     )
   `);
 
-  await query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'
-  `);
+  // Профильные поля (новая модель — заполняются на /settings после регистрации).
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255)`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(20)`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS age INT`);
 
+  // ---------- refresh_tokens ----------
   await query(`
     CREATE TABLE IF NOT EXISTS refresh_tokens (
       id SERIAL PRIMARY KEY,
@@ -27,42 +29,36 @@ const initDb = async () => {
     )
   `);
 
-  await query(`
-    CREATE TABLE IF NOT EXISTS projects (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      description TEXT DEFAULT '',
-      status VARCHAR(20) NOT NULL DEFAULT 'draft',
-      is_public BOOLEAN DEFAULT FALSE,
-      owner_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      created_at TIMESTAMP DEFAULT NOW()
-    )
-  `);
+  // ---------- удаляем старые таблицы (Project → Page → Block) ----------
+  await query(`DROP TABLE IF EXISTS projects CASCADE`);
+  await query(`DROP TABLE IF EXISTS pages CASCADE`);
+  await query(`DROP TABLE IF EXISTS blocks CASCADE`);
 
-  await query(`
-    ALTER TABLE projects
-    ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'draft'
-  `);
-
-  await query(`
-    CREATE TABLE IF NOT EXISTS pages (
-      id SERIAL PRIMARY KEY,
-      title VARCHAR(255) NOT NULL,
-      content TEXT DEFAULT '',
-      project_id INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      created_at TIMESTAMP DEFAULT NOW()
-    )
-  `);
-
+  // ---------- blocks (новая модель: блоки-«страны» на полотне) ----------
   await query(`
     CREATE TABLE IF NOT EXISTS blocks (
       id SERIAL PRIMARY KEY,
-      type VARCHAR(50) NOT NULL,
-      payload JSONB DEFAULT '{}'::jsonb,
-      page_id INT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+      content TEXT DEFAULT NULL,
+      x DOUBLE PRECISION NOT NULL,
+      y DOUBLE PRECISION NOT NULL,
+      width DOUBLE PRECISION NOT NULL,
+      height DOUBLE PRECISION NOT NULL,
+      parent_id INT DEFAULT NULL,
+      edge VARCHAR(10) DEFAULT NULL,
+      owner_id INT DEFAULT NULL REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+
+  // ---------- сид корневого блока ----------
+  const root = await query(`SELECT id FROM blocks LIMIT 1`);
+  if (root.rowCount === 0) {
+    await query(
+      `INSERT INTO blocks (content, x, y, width, height, parent_id, edge, owner_id)
+       VALUES ($1, 0, 0, 320, 220, NULL, NULL, NULL)`,
+      ['Добро пожаловать в SpeakPlane'],
+    );
+  }
 
   console.log('Database ready');
 };
